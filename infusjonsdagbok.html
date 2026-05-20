@@ -136,6 +136,13 @@
     .btn-new:active { opacity: 0.8; }
     .btn-new.teal { background: var(--teal); color: #fff; }
     .btn-new.navy { background: var(--navy); color: #fff; }
+    .btn-export {
+      background: none; border: none; cursor: pointer;
+      padding: 4px; display: flex; align-items: center;
+      border-radius: 6px; color: var(--teal);
+      transition: opacity 0.15s;
+    }
+    .btn-export:active { opacity: 0.6; }
     .btn-back, .btn-delete {
       background: none; border: none; cursor: pointer;
       padding: 4px; display: flex; align-items: center;
@@ -498,7 +505,11 @@ function vInfo() {
     <div class="top-bar">
       <div class="top-bar-side"></div>
       <h1>Pasientinformasjon</h1>
-      <div class="top-bar-side"></div>
+      <div class="top-bar-side right">
+        <button class="btn-export" onclick="exportData()" title="Eksporter">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:22px;height:22px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </button>
+      </div>
     </div>
     <div class="scroll-area">
       <div class="sec-title">Pasient</div>
@@ -633,6 +644,104 @@ function saveInfo() {
     btn.classList.replace('navy', 'green');
     setTimeout(() => { btn.textContent = 'Lagre'; btn.classList.replace('green', 'navy'); }, 2000);
   }
+}
+
+
+// ─── Export ───
+function exportData() {
+  const p = S.patient, c = S.contacts, d = S.diag;
+  const row = (label, val) => val
+    ? `<tr><td style="color:#6b7280;padding:5px 0;font-size:13px;width:45%;vertical-align:top">${label}</td><td style="padding:5px 0;font-size:13px;font-weight:500">${val}</td></tr>`
+    : '';
+  const section = (title, html) =>
+    `<div style="margin-bottom:24px">
+      <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;padding-bottom:6px;border-bottom:1.5px solid #1B3A5C">${title}</div>
+      ${html}
+    </div>`;
+  const logRows = S.entries.map(e =>
+    `<tr style="border-bottom:0.5px solid #e5e7eb">
+      <td style="padding:8px 6px;font-size:13px">${fmtDate(e.dato)}</td>
+      <td style="padding:8px 6px;font-size:13px">${esc(e.dose)} ${esc(e.enhet)}</td>
+      <td style="padding:8px 6px;font-size:13px">${esc(e.lot)||'—'}</td>
+      <td style="padding:8px 6px;font-size:13px;color:${e.bivirkninger?'#E8192C':'inherit'}">${esc(e.bivirkninger)||'—'}</td>
+    </tr>`).join('');
+  const visitRows = S.visits.map(v =>
+    `<tr style="border-bottom:0.5px solid #e5e7eb">
+      <td style="padding:8px 6px;font-size:13px">${fmtDate(v.dato)}${v.kl ? ' kl. '+esc(v.kl) : ''}</td>
+      <td style="padding:8px 6px;font-size:13px">${esc(v.kontakt)||'—'}</td>
+      <td style="padding:8px 6px;font-size:13px">${esc(v.anmerkning)||'—'}</td>
+    </tr>`).join('');
+
+  const dateStr = new Date().toLocaleDateString('nb-NO',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const entryCount = S.entries.length;
+  const visitCount = S.visits.length;
+
+  const infoTable = `<table>
+    ${row('Navn', p.navn)}
+    ${row('Personnummer', p.personnummer)}
+    ${row('År', p.ar)}
+    ${row('Lege', c.lege)}
+    ${row('Sykepleier', c.sykepleier)}
+    ${row('Diagnose', d.diagnose)}
+    ${row('Dose', d.doseG ? d.doseG+' g' : '')}
+    ${row('Doseintervall', d.doseIntervall ? d.doseIntervall+' ganger/uke' : '')}
+    ${row('Dose (ml)', d.doseMl ? d.doseMl+' ml' : '')}
+    ${row('Dose/inf.sted', d.dosePerSted ? d.dosePerSted+' ml' : '')}
+    ${row('Andre legemidler', d.andreLeg)}
+    ${row('Overfølsomhet', d.overfol)}
+    ${row('Annet', d.annet)}
+  </table>`;
+
+  const logSection = entryCount > 0 ? section('Logbok – infusjoner ('+entryCount+')',
+    `<table><thead><tr>
+      <th style="text-align:left;font-size:12px;color:#6b7280;padding:6px;background:#f2f4f7">Dato</th>
+      <th style="text-align:left;font-size:12px;color:#6b7280;padding:6px;background:#f2f4f7">Dose</th>
+      <th style="text-align:left;font-size:12px;color:#6b7280;padding:6px;background:#f2f4f7">Batchnr. (LOT)</th>
+      <th style="text-align:left;font-size:12px;color:#6b7280;padding:6px;background:#f2f4f7">Bivirkninger</th>
+    </tr></thead><tbody>${logRows}</tbody></table>`) : '';
+
+  const visitSection = visitCount > 0 ? section('Klinikkbesøk ('+visitCount+')',
+    `<table><thead><tr>
+      <th style="text-align:left;font-size:12px;color:#6b7280;padding:6px;background:#f2f4f7">Dato/tid</th>
+      <th style="text-align:left;font-size:12px;color:#6b7280;padding:6px;background:#f2f4f7">Lege/sykepleier</th>
+      <th style="text-align:left;font-size:12px;color:#6b7280;padding:6px;background:#f2f4f7">Anmerkninger</th>
+    </tr></thead><tbody>${visitRows}</tbody></table>`) : '';
+
+  const html = `<!DOCTYPE html>
+<html lang="no"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Infusjonsdagbok – ${esc(p.navn)||'Eksport'}</title>
+<style>
+  body{font-family:-apple-system,sans-serif;max-width:680px;margin:0 auto;padding:24px 20px 60px;color:#1a1a1a}
+  @media print{body{padding:0}.no-print{display:none!important}}
+</style></head><body>
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;padding-bottom:16px;border-bottom:2px solid #1B3A5C">
+  <div>
+    <div style="font-size:20px;font-weight:700;color:#1B3A5C">Infusjonsdagbok</div>
+    <div style="font-size:13px;color:#6b7280;margin-top:2px">Subkutan immunglobulinbehandling</div>
+  </div>
+  <div style="background:#E8192C;color:white;font-size:12px;font-weight:700;padding:4px 12px;border-radius:20px">SCIG</div>
+</div>
+${section('Pasientinformasjon', infoTable)}
+${logSection}
+${visitSection}
+<div style="margin-top:40px;font-size:11px;color:#9ca3af;border-top:0.5px solid #e5e7eb;padding-top:12px">
+  Eksportert ${dateStr} · CSL Behring Infusjonsdagbok SCIG
+</div>
+<div class="no-print" style="margin-top:28px;text-align:center">
+  <button onclick="window.print()" style="background:#1B3A5C;color:white;border:none;padding:13px 32px;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">
+    Skriv ut / Lagre som PDF
+  </button>
+</div>
+</body></html>`;
+
+  const blob = new Blob([html], {type:'text/html;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'infusjonsdagbok' + (p.navn ? '-'+p.navn.replace(/\s+/g,'-').toLowerCase() : '') + '.html';
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ─── Boot ───
